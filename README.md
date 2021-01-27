@@ -7,8 +7,18 @@
 Logs will be stored under C:/<pathtofolder>/TamperRegeneration/logs/ which should suffice as evidence for audit requirements.
   
 config.ini includes the following options:
-client_id     = Gathered from central.sophos.com
-client_secret = Gathered from central.sophos.com
-enabletamper  = 'true' //string true or false value when true tamper code will be regenerated for all devices in tenant
-regentamper   = 'true' //string true or false value when true tamper protection will be reenabled if someone manually disabled it from sophos central dashboard
-timezone      = America/New_York //see php doumentation for timezone options https://www.php.net/manual/en/timezones.php
+
+client_id
+Gathered from central.sophos.com
+
+client_secret
+Gathered from central.sophos.com
+
+enabletamper
+string true or false value when true tamper code will be regenerated for all devices in tenant
+
+regentamper
+string true or false value when true tamper protection will be reenabled if someone manually disabled it from sophos central dashboard
+
+timezone
+see php doumentation for timezone options https://www.php.net/manual/en/timezones.php
