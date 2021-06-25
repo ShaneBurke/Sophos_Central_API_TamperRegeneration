@@ -1,31 +1,7 @@
 <?php
+
 $ini = parse_ini_file('config.ini');
-//First get the token
-logMsg("Getting token from Sophos Central API...");
-$ch = curl_init();
-
-curl_setopt($ch, CURLOPT_URL, 'https://id.sophos.com/api/v2/oauth2/token');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-curl_setopt($ch, CURLOPT_POST, 1);
-curl_setopt($ch, CURLOPT_POSTFIELDS, "grant_type=client_credentials&client_id=".$ini['client_id']."&client_secret=".$ini['client_secret']."&scope=token");
-
-$headers = array();
-$headers[] = 'Content-Type: application/x-www-form-urlencoded';
-curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-$result = curl_exec($ch);
-if (curl_errno($ch)) {
-    logMsg('Error:' . curl_error($ch));
-}
-
-$jwt = json_decode($result);
-
-$token = $jwt->{'access_token'};
-
-logMsg("Token obtained!");
-
-curl_close($ch);
-
+$token = returnToken();
 //Now that we have a token get the tenantid
 logMsg("Getting tenant id from Sophos Central API...");
 $url = "https://api.central.sophos.com/whoami/v1";
@@ -160,10 +136,38 @@ if($ini['enabletamper'] == true){
 	logMsg("Commands WILL NOT enable tamper if disabled.");
 }
 
+logMsg("Beginning to send commands once every 4 seconds to stay within rate limits.");
+
 foreach($computers as $value){
-	logMsg("Sending command for device ID " . $value . "...");
-	
-	$url = $dataregion . "/endpoint/v1/endpoints/".$value."/tamper-protection";
+
+	$season_data = regenTamper($value, $tenantid, $token, $dataregion);
+    $tenant = json_decode($season_data, true);
+
+	if(isset($tenant['enabled'])){
+		logMsg("Command successful");
+	} else {
+		logMsg("ERROR: FIRST FAIL " . $season_data);
+		logMsg("Token: " . $token);
+		$token = returnToken();
+		$season_data = regenTamper($value, $tenantid, $token, $dataregion);
+		$tenant = json_decode($season_data, true);
+		if(isset($tenant['enabled'])){
+			logMsg("Command successful");
+		} else {
+			logMsg("CRITICAL ERROR: SECOND FAIL " . $season_data);
+			logMsg("Token: " . $token);
+			
+		}
+	}
+}
+
+logMsg("Task is complete.");
+
+function regenTamper($deviceid, $tenantid, $token, $dataregion){
+	$ini = parse_ini_file('config.ini');
+	logMsg("Sending command for device ID " . $deviceid . "...");
+	sleep(4); //sleep 4 seconds to stay within rate limit this script
+	$url = $dataregion . "/endpoint/v1/endpoints/".$deviceid."/tamper-protection";
 	
 	$data = array(
 		'regeneratePassword' => $ini['regentamper'],
@@ -197,16 +201,39 @@ foreach($computers as $value){
 
     curl_close($ch);
 	
-    $tenant = json_decode($season_data, true);
-	
-	if($tenant['enabled'] == 'true'){
-		logMsg("Command successful");
-	} else {
-		logMsg("ERROR: " . $season_data);
-	}
+    return $season_data;
 }
 
-logMsg("Task is complete.");
+function returnToken(){
+	$ini = parse_ini_file('config.ini');
+	//First get the token
+	logMsg("Getting token from Sophos Central API...");
+	$ch = curl_init();
+
+	curl_setopt($ch, CURLOPT_URL, 'https://id.sophos.com/api/v2/oauth2/token');
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_POST, 1);
+	curl_setopt($ch, CURLOPT_POSTFIELDS, "grant_type=client_credentials&client_id=".$ini['client_id']."&client_secret=".$ini['client_secret']."&scope=token");
+
+	$headers = array();
+	$headers[] = 'Content-Type: application/x-www-form-urlencoded';
+	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+	$result = curl_exec($ch);
+	if (curl_errno($ch)) {
+		logMsg('Error:' . curl_error($ch));
+	}
+
+	$jwt = json_decode($result);
+
+	$token = $jwt->{'access_token'};
+
+	logMsg("Token obtained!");
+
+	curl_close($ch);
+	
+	return $token;
+}
 
 function logMsg($msg){
 	$ini = parse_ini_file('config.ini');
